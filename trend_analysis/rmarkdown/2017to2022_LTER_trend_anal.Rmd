@@ -1,0 +1,849 @@
+---
+title: "2017to2022_trend_anal"
+author: "Sonya Havens"
+date: "2022-10-25"
+output: html_document:
+  keep.md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages, include = FALSE}
+library(tidyverse)
+library(janitor)
+library(here)
+library(ggridges)
+library(viridis)
+library(viridisLite)
+library(patchwork)
+library(ggrepel)
+library(lubridate)
+```
+
+```{r source_themes, include = FALSE}
+source(here("functions", "theme_SH_pubs.R"))
+```
+
+This file merges all of the Sample Master datasets (post 2017) and then plots the julian date versus the result for each parameter at each site.
+
+Load each annual Sample Master dataset, clean/rename the parameter and result column names, and filter for sample_number, collect_date, site, parameter, and result. 
+```{r load_SM_data}
+
+LTER_2017_orig <- read_csv(here("data", "2017_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2017 <- LTER_2017_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2018_orig <- read_csv(here("data", "2018_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2018 <- LTER_2018_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2019_orig <- read_csv(here("data", "2019_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2019 <- LTER_2019_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2020_orig <- read_csv(here("data", "2020_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2020 <- LTER_2020_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2021_orig <- read_csv(here("data", "2021_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2021 <- LTER_2021_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2022_orig <- read_csv(here("data", "2022_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2022 <- LTER_2022_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+```
+
+Merge all of the annual Sample Master datasets
+```{r merge_SM_datasets}
+
+LTER_SM_merged <- bind_rows(lst(LTER_2017, LTER_2018, LTER_2019, LTER_2020, LTER_2021, LTER_2022), .id = "batch")
+
+glimpse(LTER_SM_merged)
+
+```
+
+Clean the parameter names, and then filter for useful parameters
+```{r clean_SM_param_names}
+
+LTER_SM_wide <- LTER_SM_merged %>% 
+  distinct() %>% 
+  pivot_wider(names_from = parameter, values_from = result) %>% 
+  clean_names() %>% 
+  rename(nh3n = nh3_n) %>% 
+  rename(no3n = no3_n) %>% 
+  rename(no2n = no2_n) %>% 
+  rename(partc = part_c) %>% 
+  rename(partn = part_n) %>% 
+  rename(partp = part_p) %>% 
+  rename(partfe = part_fe) %>% 
+  rename(ph = p_h) %>% 
+  rename(srsi = sr_si)
+
+glimpse(LTER_SM_wide)
+
+LTER_SM_filtered <- LTER_SM_wide %>% 
+  select(sample_number, collect_date, site, alk, cl, so4, ca, fe, k, mg, mn, na, chla, dic, doc, nh3n, no2n, no3n, partc, partn, partp, partfe, ph, srsi, tdn, tdp, cond, o2, a254, e2_e3, e2_e4, s275_295, s350_400, sr, suva, air_temperature, black_ice, integrated_epi_to_1_percent_surface_par, secchi_depth, snow_depth, thermal_epi_depth, thermocline_depth, white_ice_layer)
+
+glimpse(LTER_SM_filtered)
+
+```
+
+
+Pivot back to long
+```{r}
+
+LTER_SM_long <- LTER_SM_filtered %>% 
+  pivot_longer(cols = c(-sample_number, -collect_date, -site), names_to = "parameter", values_to = "result")
+
+glimpse(LTER_SM_long)
+```
+
+Convert date from chr to date and add new columns for year and julian day, which are extracted from the date
+```{r}
+  
+LTER_SM <- LTER_SM_long %>% 
+  mutate(collect_date = mdy(collect_date)) %>% 
+  mutate(year = year(collect_date)) %>% 
+  mutate(julian = yday(collect_date))
+ 
+glimpse(LTER_SM)
+```
+
+# Alkalinity 
+```{r alk_plot}
+alk <- LTER_SM %>% 
+  filter(parameter == "alk") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Alkalinity") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_alk_trend_anal.pdf"), alk,
+       width = 432, height = 558, units = "mm")
+```
+
+# Chloride
+```{r cl_plot}
+cl <- LTER_SM %>% 
+  filter(parameter == "cl") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Chloride") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_cl_trend_anal.pdf"), cl,
+       width = 432, height = 558, units = "mm")
+```
+
+# Sulfate
+```{r so4_plot}
+so4 <- LTER_SM %>% 
+  filter(parameter == "so4") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Sulfate") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_so4_trend_anal.pdf"), so4,
+       width = 432, height = 558, units = "mm")
+```
+
+# Iron
+```{r fe_plot}
+fe <- LTER_SM %>% 
+  filter(parameter == "fe") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Iron") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_fe_trend_anal.pdf"), fe,
+       width = 432, height = 558, units = "mm")
+```
+
+# Potassium
+```{r k_plot}
+k <- LTER_SM %>% 
+  filter(parameter == "k") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Potassium") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_k_trend_anal.pdf"), k,
+       width = 432, height = 558, units = "mm")
+```
+
+# Magnesium
+```{r mg_plot}
+mg <- LTER_SM %>% 
+  filter(parameter == "mg") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Magnesium") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_mg_trend_anal.pdf"), mg,
+       width = 432, height = 558, units = "mm")
+```
+
+# Manganese
+```{r mn_plot}
+mn <- LTER_SM %>% 
+  filter(parameter == "mn") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Manganese") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_mn_trend_anal.pdf"), mn,
+       width = 432, height = 558, units = "mm")
+```
+
+# Sodium
+```{r na_plot}
+na <- LTER_SM %>% 
+  filter(parameter == "na") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Sodium") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_na_trend_anal.pdf"), na,
+       width = 432, height = 558, units = "mm")
+```
+
+# Chlorophyll-a
+```{r chla_plot}
+chla <- LTER_SM %>% 
+  filter(parameter == "chla") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Chlorophyll-a") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_chla_trend_anal.pdf"), chla,
+       width = 432, height = 558, units = "mm")
+```
+
+# Conductivity
+```{r cond_plot}
+cond <- LTER_SM %>% 
+  filter(parameter == "cond") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Conductivity") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_cond_trend_anal.pdf"), cond,
+       width = 432, height = 558, units = "mm")
+```
+
+# Dissolved inorganic carbon
+```{r dic_plot}
+dic <- LTER_SM %>% 
+  filter(parameter == "dic") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Dissolved inorganic carbon") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_dic_trend_anal.pdf"), dic,
+       width = 432, height = 558, units = "mm")
+```
+
+# Dissolved organic carbon
+```{r doc_plot}
+doc <- LTER_SM %>% 
+  filter(parameter == "doc") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Dissolved organic carbon") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_doc_trend_anal.pdf"), doc,
+       width = 432, height = 558, units = "mm")
+```
+
+# Dissolved oxygen
+```{r o2_plot}
+o2 <- LTER_SM %>% 
+  filter(parameter == "o2") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Dissolved oxygen") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_o2_trend_anal.pdf"), o2,
+       width = 432, height = 558, units = "mm")
+```
+
+# Ammonia (as N)
+```{r nh3n_plot}
+nh3n <- LTER_SM %>% 
+  filter(parameter == "nh3n") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Ammonia") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_nh3n_trend_anal.pdf"), nh3n,
+       width = 432, height = 558, units = "mm")
+```
+
+# Nitrite (as N)
+```{r no2n_plot}
+no2n <- LTER_SM %>% 
+  filter(parameter == "no2n") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Nitrite") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_no2n_trend_anal.pdf"), no2n,
+       width = 432, height = 558, units = "mm")
+```
+
+# Nitrate (as N)
+```{r no3n_plot}
+no3n <- LTER_SM %>% 
+  filter(parameter == "no3n") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Nitrate") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_no3n_trend_anal.pdf"), no3n,
+       width = 432, height = 558, units = "mm")
+```
+
+# Particulate carbon
+```{r partc_plot}
+partc <- LTER_SM %>% 
+  filter(parameter == "partc") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Particulate carbon") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_partc_trend_anal.pdf"), partc,
+       width = 432, height = 558, units = "mm")
+```
+
+# Particulate nitrogen
+```{r partn_plot}
+partn <- LTER_SM %>% 
+  filter(parameter == "partn") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Particulate nitrogen") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_partn_trend_anal.pdf"), partn,
+       width = 432, height = 558, units = "mm")
+```
+
+# Particulate phosphorus
+```{r partp_plot}
+partp <- LTER_SM %>% 
+  filter(parameter == "partp") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Particulate phosphorus") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_partp_trend_anal.pdf"), partp,
+       width = 432, height = 558, units = "mm")
+```
+
+# Particulate iron
+```{r partfe_plot}
+partfe <- LTER_SM %>% 
+  filter(parameter == "partfe") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Particulate iron") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_partfe_trend_anal.pdf"), partfe,
+       width = 432, height = 558, units = "mm")
+```
+
+# pH
+```{r ph_plot}
+ph <- LTER_SM %>% 
+  filter(parameter == "ph") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("pH") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_ph_trend_anal.pdf"), ph,
+       width = 432, height = 558, units = "mm")
+```
+
+# Soluble reactive silicon
+```{r srsi_plot}
+srsi <- LTER_SM %>% 
+  filter(parameter == "srsi") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Soluble reactive silicon") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_srsi_trend_anal.pdf"), srsi,
+       width = 432, height = 558, units = "mm")
+```
+
+# Total dissolved nitrogen
+```{r tdn_plot}
+tdn <- LTER_SM %>% 
+  filter(parameter == "tdn") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Total dissolved nitrogen") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_tdn_trend_anal.pdf"), tdn,
+       width = 432, height = 558, units = "mm")
+```
+
+# Total dissolved phosphorus
+```{r tdp_plot}
+tdp <- LTER_SM %>% 
+  filter(parameter == "tdp") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Total dissolved phosphorus") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_tdp_trend_anal.pdf"), tdp,
+       width = 432, height = 558, units = "mm")
+```
+
+# Absorbace at 254 nm
+```{r a254_plot}
+a254 <- LTER_SM %>% 
+  filter(parameter == "a254") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Absorbance at 254 nm") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_a254_trend_anal.pdf"), a254,
+       width = 432, height = 558, units = "mm")
+```
+
+# e2:e3
+```{r e2_e3_plot}
+e2_e3 <- LTER_SM %>% 
+  filter(parameter == "e2_e3") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("e2:e3") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_e2_e3_trend_anal.pdf"), e2_e3,
+       width = 432, height = 558, units = "mm")
+```
+
+# e2:e4
+```{r e2_e4_plot}
+e2_e4 <- LTER_SM %>% 
+  filter(parameter == "e2_e4") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("e2:e4") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_e2_e4_trend_anal.pdf"), e2_e4,
+       width = 432, height = 558, units = "mm")
+```
+
+# Spectral slope between 275 and 295 nm
+```{r s275_295_plot}
+s275_295 <- LTER_SM %>% 
+  filter(parameter == "s275_295") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Spectral slope between 275 and 295 nm") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_s275_295_trend_anal.pdf"), s275_295,
+       width = 432, height = 558, units = "mm")
+```
+
+# Spectral slope between 350 and 400 nm
+```{r s350_400_plot}
+s350_400 <- LTER_SM %>% 
+  filter(parameter == "s350_400") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Spectral slope between 275 and 295 nm") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_s350_400_trend_anal.pdf"), s350_400,
+       width = 432, height = 558, units = "mm")
+```
+
+# Spectral slope ratio
+```{r sr_plot}
+sr <- LTER_SM %>% 
+  filter(parameter == "sr") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Spectral slope ratio") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_sr_trend_anal.pdf"), sr,
+       width = 432, height = 558, units = "mm")
+```
+
+# SUVA
+```{r suva_plot}
+suva <- LTER_SM %>% 
+  filter(parameter == "suva") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("SUVA") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_suva_trend_anal.pdf"), suva,
+       width = 432, height = 558, units = "mm")
+```
+
+# Air temperature
+```{r air_temperature_plot}
+air_temperature <- LTER_SM %>% 
+  filter(parameter == "air_temperature") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Air temperature") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_air_temperature_trend_anal.pdf"), air_temperature,
+       width = 432, height = 558, units = "mm")
+```
+
+# Black ice
+```{r black_ice_plot}
+black_ice <- LTER_SM %>% 
+  filter(parameter == "black_ice") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Black ice") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_black_ice_trend_anal.pdf"), black_ice,
+       width = 432, height = 558, units = "mm")
+```
+
+# Integrated epi to 1% surface par
+```{r integrated_epi_to_1_percent_surface_par_plot}
+integrated_epi_to_1_percent_surface_par <- LTER_SM %>% 
+  filter(parameter == "integrated_epi_to_1_percent_surface_par") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Integrated epi to 1% surface par") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_integrated_epi_to_1_percent_surface_par_trend_anal.pdf"), integrated_epi_to_1_percent_surface_par,
+       width = 432, height = 558, units = "mm")
+```
+
+# Secchi depth
+```{r secchi_depth_plot}
+secchi_depth <- LTER_SM %>% 
+  filter(parameter == "secchi_depth") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Secchi depth") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_secchi_depth_trend_anal.pdf"), secchi_depth,
+       width = 432, height = 558, units = "mm")
+```
+
+# Snow depth
+```{r snow_depth_plot}
+snow_depth <- LTER_SM %>% 
+  filter(parameter == "snow_depth") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Snow depth") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_snow_depth_trend_anal.pdf"), snow_depth,
+       width = 432, height = 558, units = "mm")
+```
+
+# Thermal epi depth
+```{r thermal_epi_depth_plot}
+thermal_epi_depth <- LTER_SM %>% 
+  filter(parameter == "thermal_epi_depth") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Thermal epi depth") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_thermal_epi_depth_trend_anal.pdf"), thermal_epi_depth,
+       width = 432, height = 558, units = "mm")
+```
+
+# Thermocline depth
+```{r thermocline_depth_plot}
+thermocline_depth <- LTER_SM %>% 
+  filter(parameter == "thermocline_depth") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("Thermocline depth") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_thermocline_depth_trend_anal.pdf"), thermocline_depth,
+       width = 432, height = 558, units = "mm")
+```
+
+# White ice layer
+```{r white_ice_layer_plot}
+white_ice_layer <- LTER_SM %>% 
+  filter(parameter == "white_ice_layer") %>% 
+   drop_na() %>% 
+
+  ggplot() +
+  facet_wrap(~ site) +
+  geom_point(aes(x = julian, y = result, colour = year)) +
+  geom_path(aes(x = julian, y = result, colour = year)) +
+  ggtitle("White ice layer") +
+  theme_SH_pubs() +
+  scale_color_viridis()
+  
+ggsave(here("figures", "2017to2022_white_ice_layer_trend_anal.pdf"), white_ice_layer,
+       width = 432, height = 558, units = "mm")
+```
+
+
+```{r timestamp}
+str_c("This report was created on", Sys.Date(), sep = " ")
+```

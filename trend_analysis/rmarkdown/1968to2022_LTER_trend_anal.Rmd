@@ -1,0 +1,200 @@
+---
+title: "1968to2022_LTER_trend_anal"
+author: "Sonya Havens"
+date: "2022-10-25"
+output: html_document:
+  keep.md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_packages, include = FALSE}
+library(tidyverse)
+library(janitor)
+library(here)
+library(ggridges)
+library(viridis)
+library(viridisLite)
+library(patchwork)
+library(ggrepel)
+library(lubridate)
+```
+
+```{r source_themes, include = FALSE}
+source(here("functions", "theme_SH_pubs.R"))
+```
+
+This file loads and cleans the dbase and Sample Master datasets and cleans and filters them and then merges them into one dataset so that plots or stats can be conducted on chemistry data spanning from 1968 to 2022. 
+
+Load dbase dataset, clean/rename the column names, and add a site column, which is concatenated with location, subloc, station, and depth, and add a julian column wherein the julian day is extracted from the date.
+```{r load_dbase_data}
+LTER_dbase_orig <- read_csv(here("data", "LTER_chem_1968to2017.csv")) %>% 
+  clean_names() %>% 
+  rename(nh3n = nh4) %>% 
+  rename(partc = suspc) %>% 
+  rename(partn = suspn) %>% 
+  rename(partp = suspp) %>% 
+  rename(partfe = susfe) %>% 
+  rename(ph = elaph) %>% 
+  rename(dic = eladic) %>% 
+  rename(no2n = no2) %>% 
+  rename(no3n = no3) %>% 
+  rename(sample_number = number) %>% 
+  rename(collect_date = sampled) %>% 
+  mutate(site = str_c(location, subloc, station, depth, sep = " ")) %>% 
+  mutate(julian = yday(collect_date))
+
+glimpse(LTER_dbase_orig)
+```
+
+Pivot the dbase dataset to long
+```{r}
+LTER_dbase_long <- LTER_dbase_orig %>% 
+  pivot_longer(cols = c(-sample_number, -collect_date, -year, -type, -location, -subloc, -station, -depth, -site, -julian), names_to = "parameter", values_to = "result") %>% 
+  mutate(sample_number = as.character(sample_number))
+
+glimpse(LTER_dbase_long)
+```
+
+Filter for sample_number, collect_date, year, julian, site, parameter, and result
+```{r filtered_dbase_dataframe}
+
+LTER_dbase <- LTER_dbase_long %>% 
+  select(sample_number, collect_date, year, julian, site, parameter, result) %>% 
+  replace(.==0, NA)
+
+glimpse(LTER_dbase)
+```
+
+Load each annaul Sample Master dataset, clean/rename the parameter and result column names, and filter for sample_number, collect_date, site, parameter, and result. 
+```{r load_SM_data}
+
+LTER_2017_orig <- read_csv(here("data", "2017_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2017 <- LTER_2017_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2018_orig <- read_csv(here("data", "2018_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2018 <- LTER_2018_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2019_orig <- read_csv(here("data", "2019_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2019 <- LTER_2019_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2020_orig <- read_csv(here("data", "2020_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2020 <- LTER_2020_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2021_orig <- read_csv(here("data", "2021_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2021 <- LTER_2021_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+
+
+LTER_2022_orig <- read_csv(here("data", "2022_LTER_data.csv")) %>% 
+  clean_names() %>% 
+  rename(parameter = param) %>% 
+  rename(result = numeric_result)
+
+LTER_2022 <- LTER_2022_orig %>% 
+  select(sample_number, collect_date, site, parameter, result)
+```
+
+
+Merge all of the annual Sample Master datasets
+```{r merge_SM_datasets}
+
+LTER_SM_merged <- bind_rows(lst(LTER_2017, LTER_2018, LTER_2019, LTER_2020, LTER_2021, LTER_2022), .id = "batch")
+
+glimpse(LTER_SM_merged)
+
+```
+
+Clean the parameter names, and then filter for useful parameters
+```{r clean_SM_param_names}
+
+LTER_SM_wide <- LTER_SM_merged %>% 
+  distinct() %>% 
+  pivot_wider(names_from = parameter, values_from = result) %>% 
+  clean_names() %>% 
+  rename(nh3n = nh3_n) %>% 
+  rename(no3n = no3_n) %>% 
+  rename(no2n = no2_n) %>% 
+  rename(partc = part_c) %>% 
+  rename(partn = part_n) %>% 
+  rename(partp = part_p) %>% 
+  rename(partfe = part_fe) %>% 
+  rename(ph = p_h) %>% 
+  rename(srsi = sr_si)
+
+glimpse(LTER_SM_wide)
+
+LTER_SM_filtered <- LTER_SM_wide %>% 
+  select(sample_number, collect_date, site, alk, cl, so4, ca, fe, k, mg, mn, na, chla, dic, doc, nh3n, no2n, partc, partn, partp, partfe, ph, srsi, tdn, tdp, cond, o2, a254, e2_e3, e2_e4, s275_295, s350_400, sr, suva, air_temperature, black_ice, integrated_epi_to_1_percent_surface_par, secchi_depth, snow_depth, thermal_epi_depth, thermocline_depth, white_ice_layer)
+
+glimpse(LTER_SM_filtered)
+
+```
+
+
+Pivot back to long
+
+```{r}
+
+LTER_SM_long <- LTER_SM_filtered %>% 
+  pivot_longer(cols = c(-sample_number, -collect_date, -site), names_to = "parameter", values_to = "result")
+
+glimpse(LTER_SM_long)
+```
+
+Convert date from chr to date and add new columns for year and julian day, which are extracted from the date
+```{r}
+  
+LTER_SM <- LTER_SM_long %>% 
+  mutate(collect_date = mdy(collect_date)) %>% 
+  mutate(year = year(collect_date)) %>% 
+  mutate(julian = yday(collect_date))
+ 
+glimpse(LTER_SM)
+```
+
+
+Merge the cleaned dbase and Sample Master datasets. 
+```{r merged_dbase_SM}
+
+LTER_merged <- bind_rows(lst(LTER_dbase, LTER_SM), .id = "batch")
+
+glimpse(LTER_merged)
+
+```
+
+
+```{r timestamp}
+str_c("This report was created on", Sys.Date(), sep = " ")
+```
+
